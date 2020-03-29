@@ -3,6 +3,7 @@ import logging
 import time
 import re
 import feedparser
+import requests
 
 try:
     # Python 2
@@ -69,20 +70,34 @@ class Search(object):
             logger.info('max_results defaulting to inf.')
             self.max_results = float('inf')
 
-    def _get_url(self, start=0, max_results=None):
+    def _fetch_page(self, start=0, max_results=None):
+        data = {
+            "search_query": self.query,
+            "id_list": self.id_list,
+            "start": start,
+            "max_results": max_results,
+            "sortBy": self.sort_by,
+            "sortOrder": self.sort_order
+        }
+        r = requests.post(url=self.root_url, data=data)
+        print(data)
+        # TODO: Handle HTTP errors.
+        return r.text
 
-        url_args = urlencode(
-            {
-                "search_query": self.query,
-                "id_list": self.id_list,
-                "start": start,
-                "max_results": max_results,
-                "sortBy": self.sort_by,
-                "sortOrder": self.sort_order
-            }
-        )
-
-        return self.root_url + 'query?' + url_args
+    # def _get_url(self, start=0, max_results=None):
+    #
+    #     url_args = urlencode(
+    #         {
+    #             "search_query": self.query,
+    #             "id_list": self.id_list,
+    #             "start": start,
+    #             "max_results": max_results,
+    #             "sortBy": self.sort_by,
+    #             "sortOrder": self.sort_order
+    #         }
+    #     )
+    #
+    #     return self.root_url + 'query?' + url_args
 
     def _parse(self, url):
         """
@@ -90,10 +105,10 @@ class Search(object):
         """
         result = feedparser.parse(url)
 
-        if result.get('status') != 200:
-            logger.error(
-                "HTTP Error {} in query".format(result.get('status', 'no status')))
-            return []
+        # if result.get('status') != 200:
+        #     logger.error(
+        #         "HTTP Error {} in query".format(result.get('status', 'no status')))
+        #     return []
         return result['entries']
 
     def _prune_result(self, result):
@@ -152,11 +167,12 @@ class Search(object):
                 time.sleep(self.time_sleep)
 
             logger.info('Fetch from arxiv ({} results left to download)'.format(n_left))
-            url = self._get_url(
-                start=start,
-                max_results=min(n_left, self.max_chunk_results))
+            page = self._fetch_page(start=start, max_results=min(n_left, self.max_chunk_results))
+            # url = self._get_url(
+            #     start=start,
+            #     max_results=min(n_left, self.max_chunk_results))
 
-            results = self._parse(url)
+            results = self._parse(page)
 
             # Update the entries left to download
             n_fetched = len(results)
