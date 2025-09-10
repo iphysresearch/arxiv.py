@@ -1,0 +1,27 @@
+name: Notify Mattermost
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    types: [opened, closed, reopened, merged]
+  release:
+    types: [published]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send notification to Mattermost
+        run: |
+          # 构造一条简单消息，包含 repo 名称、事件类型和触发用户
+          payload=$(jq -n \
+            --arg repo "${{ github.repository }}" \
+            --arg event "${{ github.event_name }}" \
+            --arg actor "${{ github.actor }}" \
+            --arg ref "${{ github.ref }}" \
+            '{text: ("📢 GitHub Event: \($event)\n📂 Repo: \($repo)\n👤 Actor: \($actor)\n🌿 Ref: \($ref)") }')
+          
+          curl -X POST -H 'Content-Type: application/json' \
+            -d "$payload" \
+            ${{ secrets.MATTERMOST_WEBHOOK_URL }}
